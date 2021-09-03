@@ -144,4 +144,121 @@ endDT =datetime.now()
 print("End datetime to Compute Shap values:", endDT)
 ```
 
+## Store SHAP Values
 
+```
+from datetime import datetime
+startDT = datetime.now()
+print("Start datetime to Compute Shap values:", startDT)
+```
+
+
+```
+#Shap Golbal Explainer with 1 sample - TAKES 8.25 hours to run for 1 sample
+example = background.sample(n=1)
+
+shap_values = explainer.shap_values(background)
+shap_interaction_values = explainer.shap_interaction_values(background)
+expected_value = explainer.expected_value
+shap_values1 = shap_values[1]
+```
+
+```
+shap_values0 = shap_values[0]
+shap_values0
+```
+
+```
+#Store the SHAP Values 
+cols = background.columns
+explainer_output_path = '/dbfs/mnt/folder path/'
+
+#save the probability of "true" variant 
+shap_values_df = pd.DataFrame(shap_values[1], columns=cols)
+shap_values_save_path = explainer_output_path+'shap_values_1.csv'
+shap_values_df.to_csv(shap_values_save_path, index=False)
+mlflow.log_artifact(shap_values_save_path)
+
+# #save expected_values
+# save both True/False variations here
+expected_values_df = pd.DataFrame({'expectedValue': [expected_value]}) # pd.DataFrame({0:[dq_expected_value[0]], 1:[dq_expected_value[1]]})
+expected_values_save_path = explainer_output_path+'expected_values.csv'
+expected_values_df.to_csv(expected_values_save_path, index=False)
+mlflow.log_artifact(expected_values_save_path)
+
+#save dq_shap_interaction_values
+shap_interaction_values_df = pd.Dataframe(shap_interaction_values[1])
+shap_interaction_values_df_save_path = explainer_output_path+'shap_interaction_values_1.csv'
+shap_interaction_values_df.to_csv(shap_interaction_values_df_save_path, index=False)
+mlflow.log_artifact(shap_interaction_values_df_save_path)
+```
+
+```
+#save explainer object
+import joblib
+explainer_save_path = explainer_output_path+'explainer.bz2'
+joblib.dump(explainer, explainer_save_path, compress=('bz2', 9))
+mlflow.log_artifact(explainer_save_path)
+```
+
+```
+endDT =datetime.now()
+print("End datetime to Compute Shap values:", endDT)
+```
+
+```
+shap.summary_plot(shap_values1, example, feature_names, plot_type='bar')
+```
+
+```
+mlflow.end_run()
+```
+
+## SHAP using mlflow log
+
+```
+import os
+import mlflow
+
+# log an explanation
+with mlflow.start_run() as run:
+    mlflow.shap.log_explanation(loaded_model.predict_proba, example)
+
+# list artifacts
+client = mlflow.tracking.MlflowClient()
+artifact_path = "model_explanations_shap"
+artifacts = [x.path for x in client.list_artifacts(run.info.run_id, artifact_path)]
+print("# artifacts:")
+print(artifacts)
+
+# load back the logged explanation
+dst_path = client.download_artifacts(run.info.run_id, artifact_path)
+base_values = np.load(os.path.join(dst_path, "base_values.npy"))
+shap_values = np.load(os.path.join(dst_path, "shap_values.npy"))
+
+mlflow.end_run()
+```
+
+```
+import os
+import mlflow
+
+# log an explanation
+with mlflow.start_run(run_name='loan_app_explainability') as run:
+    #mlflow.shap.log_explainer(explainer=explainer,artifact_path ="shap_explainer")
+    mlflow.shap.log_explanation(loaded_model.predict, example)
+
+# list artifacts
+client = mlflow.tracking.MlflowClient()
+artifact_path = "model_explanations_shap"
+artifacts = [x.path for x in client.list_artifacts(run.info.run_id, artifact_path)]
+print("# artifacts:")
+print(artifacts)
+
+# load back the logged explanation
+dst_path = client.download_artifacts(run.info.run_id, artifact_path)
+base_values = np.load(os.path.join(dst_path, "base_values.npy"))
+shap_values = np.load(os.path.join(dst_path, "shap_values.npy"))
+
+mlflow.end_run()
+```
